@@ -240,7 +240,42 @@
   gap: 0.25rem;
 }
 
+.edit-input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--accent-color);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  width: 100%;
+  padding: 0.25rem 0;
+}
+
+.todo-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.action-btn {
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.action-btn.edit:hover { color: var(--accent-color); }
+.action-btn.delete:hover { color: var(--danger-color); background: rgba(239, 68, 68, 0.1); }
+.action-btn.save:hover { color: var(--success-color); }
+
 .delete-btn {
+
 
 
   color: var(--text-secondary);

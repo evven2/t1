@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Check, Moon, Sun, ClipboardList, Clock, CalendarCheck, Filter, LayoutGrid, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Trash2, Check, Moon, Sun, ClipboardList, Clock, CalendarCheck, LayoutGrid, CheckCircle2, Circle, Edit2, X, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
@@ -27,6 +27,10 @@ function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('theme') || 'light';
   });
+
+  // Edit states
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
 
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
@@ -78,10 +82,33 @@ function App() {
           : todo
       )
     );
+    if (editingId === id) cancelEdit();
   };
 
   const deleteTodo = (id) => {
     setTodos(todos.filter((todo) => todo.id !== id));
+    if (editingId === id) cancelEdit();
+  };
+
+  const startEdit = (todo) => {
+    if (todo.completed) return;
+    setEditingId(todo.id);
+    setEditingText(todo.text);
+  };
+
+  const saveEdit = () => {
+    if (!editingText.trim()) return;
+    setTodos(
+      todos.map((todo) =>
+        todo.id === editingId ? { ...todo, text: editingText.trim() } : todo
+      )
+    );
+    cancelEdit();
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
   };
 
   const toggleTheme = () => {
@@ -191,10 +218,22 @@ function App() {
                 >
                   {todo.completed && <Check size={16} strokeWidth={3} />}
                 </button>
+                
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <span className={`todo-text ${todo.completed ? 'completed' : ''}`}>
-                    {todo.text}
-                  </span>
+                  {editingId === todo.id ? (
+                    <input
+                      className="edit-input"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className={`todo-text ${todo.completed ? 'completed' : ''}`}>
+                      {todo.text}
+                    </span>
+                  )}
+                  
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                     <span className={`priority-badge ${todo.priority || 'normal'}`}>
                       {PRIORITIES[(todo.priority || 'normal').toUpperCase()]?.label}
@@ -209,9 +248,30 @@ function App() {
                     </div>
                   </div>
                 </div>
-                <button className="delete-btn" onClick={() => deleteTodo(todo.id)}>
-                  <Trash2 size={18} />
-                </button>
+
+                <div className="todo-actions">
+                  {editingId === todo.id ? (
+                    <>
+                      <button className="action-btn save" onClick={saveEdit}>
+                        <Save size={18} />
+                      </button>
+                      <button className="action-btn" onClick={cancelEdit}>
+                        <X size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {!todo.completed && (
+                        <button className="action-btn edit" onClick={() => startEdit(todo)}>
+                          <Edit2 size={18} />
+                        </button>
+                      )}
+                      <button className="action-btn delete" onClick={() => deleteTodo(todo.id)}>
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </motion.div>
             ))
           ) : (
