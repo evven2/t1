@@ -199,6 +199,13 @@
   border-color: var(--success-color);
 }
 
+.checkbox.disabled {
+  background: var(--border-color);
+  border-color: var(--border-color);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .todo-text {
   flex: 1;
   font-size: 1rem;
@@ -211,6 +218,12 @@
   color: var(--text-secondary);
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+.todo-text.deleted {
+  color: var(--danger-color);
+  text-decoration: line-through;
+  opacity: 0.5;
 }
 
 .priority-badge {
@@ -274,7 +287,72 @@
 .action-btn.delete:hover { color: var(--danger-color); background: rgba(239, 68, 68, 0.1); }
 .action-btn.save:hover { color: var(--success-color); }
 
+/* Custom Alert Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+  border-radius: 24px;
+  width: 90%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.modal-icon {
+  width: 56px;
+  height: 56px;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content p {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.modal-btn {
+  background: var(--accent-color);
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.modal-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+}
+
 .delete-btn {
+
 
 
 

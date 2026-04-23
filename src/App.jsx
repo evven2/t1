@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Check, Moon, Sun, ClipboardList, Clock, CalendarCheck, LayoutGrid, CheckCircle2, Circle, Edit2, X, Save } from 'lucide-react';
+import { Plus, Trash2, Check, Moon, Sun, ClipboardList, Clock, CalendarCheck, LayoutGrid, CheckCircle2, Circle, Edit2, X, Save, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
@@ -13,6 +13,7 @@ const STATUS_FILTERS = {
   ALL: { id: 'all', label: '전체', icon: <LayoutGrid size={14} /> },
   PENDING: { id: 'pending', label: '진행 중', icon: <Circle size={14} /> },
   COMPLETED: { id: 'completed', label: '완료', icon: <CheckCircle2 size={14} /> },
+  DELETED: { id: 'deleted', label: '삭제', icon: <Trash2 size={14} /> },
 };
 
 function App() {
@@ -28,9 +29,10 @@ function App() {
     return localStorage.getItem('theme') || 'light';
   });
 
-  // Edit states
+  // Edit & Alert states
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
@@ -54,7 +56,10 @@ function App() {
 
   const addTodo = (e) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim()) {
+      setShowAlert(true);
+      return;
+    }
 
     const newTodo = {
       id: Date.now(),
@@ -86,7 +91,11 @@ function App() {
   };
 
   const deleteTodo = (id) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, isDeleted: true, deletedAt: new Date().toISOString() } : todo
+      )
+    );
     if (editingId === id) cancelEdit();
   };
 
@@ -97,7 +106,10 @@ function App() {
   };
 
   const saveEdit = () => {
-    if (!editingText.trim()) return;
+    if (!editingText.trim()) {
+      setShowAlert(true);
+      return;
+    }
     setTodos(
       todos.map((todo) =>
         todo.id === editingId ? { ...todo, text: editingText.trim() } : todo
@@ -117,12 +129,21 @@ function App() {
 
   const filteredTodos = todos.filter((todo) => {
     const matchesPriority = priorityFilter === 'all' || (todo.priority || 'normal') === priorityFilter;
-    const matchesStatus = 
-      statusFilter === 'all' || 
-      (statusFilter === 'completed' && todo.completed) || 
-      (statusFilter === 'pending' && !todo.completed);
     
-    return matchesPriority && matchesStatus;
+    // Status Filter Logic
+    if (statusFilter === 'deleted') {
+      return matchesPriority && todo.isDeleted;
+    } else {
+      // If not viewing 'deleted', exclude deleted items
+      if (todo.isDeleted) return false;
+      
+      const matchesStatus = 
+        statusFilter === 'all' || 
+        (statusFilter === 'completed' && todo.completed) || 
+        (statusFilter === 'pending' && !todo.completed);
+      
+      return matchesPriority && matchesStatus;
+    }
   });
 
   return (
@@ -213,8 +234,9 @@ function App() {
                 className="todo-item glass-card"
               >
                 <button
-                  className={`checkbox ${todo.completed ? 'checked' : ''}`}
-                  onClick={() => toggleTodo(todo.id)}
+                  className={`checkbox ${todo.completed ? 'checked' : ''} ${todo.isDeleted ? 'disabled' : ''}`}
+                  onClick={() => !todo.isDeleted && toggleTodo(todo.id)}
+                  disabled={todo.isDeleted}
                 >
                   {todo.completed && <Check size={16} strokeWidth={3} />}
                 </button>
@@ -229,7 +251,7 @@ function App() {
                       autoFocus
                     />
                   ) : (
-                    <span className={`todo-text ${todo.completed ? 'completed' : ''}`}>
+                    <span className={`todo-text ${todo.completed ? 'completed' : ''} ${todo.isDeleted ? 'deleted' : ''}`}>
                       {todo.text}
                     </span>
                   )}
@@ -240,9 +262,14 @@ function App() {
                     </span>
                     <div className="timestamp">
                       <span><Clock size={12} /> {formatDate(todo.createdAt)} 등록</span>
-                      {todo.completedAt && (
+                      {todo.completedAt && !todo.isDeleted && (
                         <span style={{ color: 'var(--success-color)' }}>
                           <CalendarCheck size={12} /> {formatDate(todo.completedAt)} 완료
+                        </span>
+                      )}
+                      {todo.isDeleted && (
+                        <span style={{ color: 'var(--danger-color)' }}>
+                          <Trash2 size={12} /> {formatDate(todo.deletedAt)} 삭제됨
                         </span>
                       )}
                     </div>
@@ -250,26 +277,28 @@ function App() {
                 </div>
 
                 <div className="todo-actions">
-                  {editingId === todo.id ? (
-                    <>
-                      <button className="action-btn save" onClick={saveEdit}>
-                        <Save size={18} />
-                      </button>
-                      <button className="action-btn" onClick={cancelEdit}>
-                        <X size={18} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {!todo.completed && (
-                        <button className="action-btn edit" onClick={() => startEdit(todo)}>
-                          <Edit2 size={18} />
+                   {!todo.isDeleted && (
+                    editingId === todo.id ? (
+                      <>
+                        <button className="action-btn save" onClick={saveEdit}>
+                          <Save size={18} />
                         </button>
-                      )}
-                      <button className="action-btn delete" onClick={() => deleteTodo(todo.id)}>
-                        <Trash2 size={18} />
-                      </button>
-                    </>
+                        <button className="action-btn" onClick={cancelEdit}>
+                          <X size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {!todo.completed && (
+                          <button className="action-btn edit" onClick={() => startEdit(todo)}>
+                            <Edit2 size={18} />
+                          </button>
+                        )}
+                        <button className="action-btn delete" onClick={() => deleteTodo(todo.id)}>
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    )
                   )}
                 </div>
               </motion.div>
@@ -289,6 +318,35 @@ function App() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Custom Alert Modal */}
+      <AnimatePresence>
+        {showAlert && (
+          <motion.div 
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowAlert(false)}
+          >
+            <motion.div 
+              className="modal-content"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-icon">
+                <AlertCircle size={32} />
+              </div>
+              <p>내용을 입력해 주세요!</p>
+              <button className="modal-btn" onClick={() => setShowAlert(false)}>
+                확인
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
