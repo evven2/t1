@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Check, Moon, Sun, ClipboardList, Clock, CalendarCheck, LayoutGrid, CheckCircle2, Circle, Edit2, X, Save, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from './supabaseClient';
 import './App.css';
 
 const PRIORITIES = {
@@ -17,10 +18,8 @@ const STATUS_FILTERS = {
 };
 
 function App() {
-  const [todos, setTodos] = useState(() => {
-    const saved = localStorage.getItem('todos');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [todos, setTodos] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [priority, setPriority] = useState(PRIORITIES.NORMAL.id);
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -35,13 +34,30 @@ function App() {
   const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('todos', JSON.stringify(todos));
-  }, [todos]);
+    fetchTodos();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  const fetchTodos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTodos(data || []);
+    } catch (error) {
+      console.error('Error fetching todos:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -54,7 +70,7 @@ function App() {
     });
   };
 
-  const addTodo = (e) => {
+  const addTodo = async (e) => {
     e.preventDefault();
     if (!inputValue.trim()) {
       setShowAlert(true);
@@ -62,40 +78,66 @@ function App() {
     }
 
     const newTodo = {
-      id: Date.now(),
       text: inputValue.trim(),
       completed: false,
       priority: priority,
-      createdAt: new Date().toISOString(),
-      completedAt: null,
+      created_at: new Date().toISOString(),
+      is_deleted: false
     };
 
-    setTodos([newTodo, ...todos]);
-    setInputValue('');
-    setPriority(PRIORITIES.NORMAL.id);
+    try {
+      const { data, error } = await supabase
+        .from('todos')
+        .insert([newTodo])
+        .select();
+
+      if (error) throw error;
+      setTodos([data[0], ...todos]);
+      setInputValue('');
+      setPriority(PRIORITIES.NORMAL.id);
+    } catch (error) {
+      console.error('Error adding todo:', error.message);
+    }
   };
 
-  const toggleTodo = (id) => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === id 
-          ? { 
-              ...todo, 
-              completed: !todo.completed, 
-              completedAt: !todo.completed ? new Date().toISOString() : null 
-            } 
-          : todo
-      )
-    );
+  const toggleTodo = async (id) => {
+    const todoToToggle = todos.find(t => t.id === id);
+    const updates = {
+      completed: !todoToToggle.completed,
+      completed_at: !todoToToggle.completed ? new Date().toISOString() : null
+    };
+
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      setTodos(todos.map(t => t.id === id ? { ...t, ...updates } : t));
+    } catch (error) {
+      console.error('Error toggling todo:', error.message);
+    }
     if (editingId === id) cancelEdit();
   };
 
-  const deleteTodo = (id) => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === id ? { ...todo, isDeleted: true, deletedAt: new Date().toISOString() } : todo
-      )
-    );
+  const deleteTodo = async (id) => {
+    const updates = {
+      is_deleted: true,
+      deleted_at: new Date().toISOString()
+    };
+
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      setTodos(todos.map(t => t.id === id ? { ...t, ...updates } : t));
+    } catch (error) {
+      console.error('Error deleting todo:', error.message);
+    }
     if (editingId === id) cancelEdit();
   };
 
@@ -105,17 +147,24 @@ function App() {
     setEditingText(todo.text);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingText.trim()) {
       setShowAlert(true);
       return;
     }
-    setTodos(
-      todos.map((todo) =>
-        todo.id === editingId ? { ...todo, text: editingText.trim() } : todo
-      )
-    );
-    cancelEdit();
+
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update({ text: editingText.trim() })
+        .eq('id', editingId);
+
+      if (error) throw error;
+      setTodos(todos.map(t => t.id === editingId ? { ...t, text: editingText.trim() } : t));
+      cancelEdit();
+    } catch (error) {
+      console.error('Error saving edit:', error.message);
+    }
   };
 
   const cancelEdit = () => {
@@ -132,10 +181,10 @@ function App() {
     
     // Status Filter Logic
     if (statusFilter === 'deleted') {
-      return matchesPriority && todo.isDeleted;
+      return matchesPriority && todo.is_deleted;
     } else {
       // If not viewing 'deleted', exclude deleted items
-      if (todo.isDeleted) return false;
+      if (todo.is_deleted) return false;
       
       const matchesStatus = 
         statusFilter === 'all' || 
@@ -234,9 +283,9 @@ function App() {
                 className="todo-item glass-card"
               >
                 <button
-                  className={`checkbox ${todo.completed ? 'checked' : ''} ${todo.isDeleted ? 'disabled' : ''}`}
-                  onClick={() => !todo.isDeleted && toggleTodo(todo.id)}
-                  disabled={todo.isDeleted}
+                  className={`checkbox ${todo.completed ? 'checked' : ''} ${todo.is_deleted ? 'disabled' : ''}`}
+                  onClick={() => !todo.is_deleted && toggleTodo(todo.id)}
+                  disabled={todo.is_deleted}
                 >
                   {todo.completed && <Check size={16} strokeWidth={3} />}
                 </button>
@@ -251,7 +300,7 @@ function App() {
                       autoFocus
                     />
                   ) : (
-                    <span className={`todo-text ${todo.completed ? 'completed' : ''} ${todo.isDeleted ? 'deleted' : ''}`}>
+                    <span className={`todo-text ${todo.completed ? 'completed' : ''} ${todo.is_deleted ? 'deleted' : ''}`}>
                       {todo.text}
                     </span>
                   )}
@@ -261,15 +310,15 @@ function App() {
                       {PRIORITIES[(todo.priority || 'normal').toUpperCase()]?.label}
                     </span>
                     <div className="timestamp">
-                      <span><Clock size={12} /> {formatDate(todo.createdAt)} 등록</span>
-                      {todo.completedAt && !todo.isDeleted && (
+                      <span><Clock size={12} /> {formatDate(todo.created_at)} 등록</span>
+                      {todo.completed_at && !todo.is_deleted && (
                         <span style={{ color: 'var(--success-color)' }}>
-                          <CalendarCheck size={12} /> {formatDate(todo.completedAt)} 완료
+                          <CalendarCheck size={12} /> {formatDate(todo.completed_at)} 완료
                         </span>
                       )}
-                      {todo.isDeleted && (
+                      {todo.is_deleted && (
                         <span style={{ color: 'var(--danger-color)' }}>
-                          <Trash2 size={12} /> {formatDate(todo.deletedAt)} 삭제됨
+                          <Trash2 size={12} /> {formatDate(todo.deleted_at)} 삭제됨
                         </span>
                       )}
                     </div>
@@ -277,7 +326,7 @@ function App() {
                 </div>
 
                 <div className="todo-actions">
-                   {!todo.isDeleted && (
+                   {!todo.is_deleted && (
                     editingId === todo.id ? (
                       <>
                         <button className="action-btn save" onClick={saveEdit}>
